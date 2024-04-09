@@ -7,7 +7,7 @@ import numpy as np
 from utils.logger import Logger
 
 # fix random seed
-np.random.seed(0)
+# np.random.seed(0)
 
 def random_floats(size, low=0, high=1):
     return [np.random.uniform(low, high) for _ in range(size)]

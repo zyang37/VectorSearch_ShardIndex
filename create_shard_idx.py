@@ -14,7 +14,7 @@ from utils.read_write import save_np_to_file, load_npy
 from utils.vdb_utils import random_normal_vectors, save_index, random_floats
 
 # fix random seed
-np.random.seed(0)
+# np.random.seed(0)
 
 def create_ivf_index(npy_path):
     # load npy file

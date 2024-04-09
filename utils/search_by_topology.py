@@ -9,7 +9,7 @@ import numpy as np
 from utils.vdb_utils import query_index_file
 
 # fix random seed
-np.random.seed(0)
+# np.random.seed(0)
 
 def reverse_stopology(stopology):
     '''

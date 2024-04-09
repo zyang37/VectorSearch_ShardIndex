@@ -14,7 +14,7 @@ from utils.vdb_utils import load_index, random_floats, random_normal_vectors, qu
 from utils.search_by_topology import search_outterloop_index, search_outterloop_query, reverse_stopology
 
 # fix random seed
-np.random.seed(0)
+# np.random.seed(0)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Query shard index for vector database")
