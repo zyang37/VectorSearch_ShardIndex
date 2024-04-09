@@ -1,0 +1,10 @@
+**/__pycache__/*
+**/logs/*
+.vscode
+.DS_Store
+.venv
+tmp_idx/*
+shards/*
+tmp_centroids/*
+default_dataset.npy
+tmp.py
