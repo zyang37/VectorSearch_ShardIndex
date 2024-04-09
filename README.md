@@ -10,3 +10,5 @@ python vectordb/create_shard_idx.py
 ```
 python query_shard_idx.py
 ```
+
+
