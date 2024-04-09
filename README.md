@@ -1,12 +1,11 @@
 
 # Vecter Search for Large Sharded Index
 
-## Create the index first
+## Generate the shards
 ```
-cd vectordb/
 mkdir shards
 
-python vectordb/create_shard_idx.py
+python create_shard_idx.py
 ```
 
 ## Then run the query

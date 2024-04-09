@@ -30,7 +30,11 @@ if __name__ == "__main__":
 
     os.makedirs("logs", exist_ok=True)
     # Note it will keep appending to the log file if file exists!
-    logging.basicConfig(filename='logs/app.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    # logging.basicConfig(filename='logs/app.log', level=logging.INFO, format='%(asctime)s.%(msecs)03d,%(levelname)s,%(message)s')
+    time_format = "%Y-%m-%d %H:%M:%S"
+    logging.basicConfig(filename='logs/app.log', level=logging.INFO, format='%(asctime)s,%(message)s', datefmt=time_format)
+
+    # headers: timestamp,action,latency,args
 
     # args
     print(args)
@@ -42,12 +46,12 @@ if __name__ == "__main__":
     mixtures_ratio = args.mixtures_ratio
 
     # log cfg 
-    logging.info(f"Index root: {index_root}")
-    logging.info(f"nprobe: {nprobe}")
-    logging.info(f"k: {k}")
-    logging.info(f"dim: {dim}")
-    logging.info(f"num_queries: {num_queries}")
-    logging.info(f"mixtures_ratio: {mixtures_ratio}")
+    # logging.info(f"Index root: {index_root}")
+    # logging.info(f"nprobe: {nprobe}")
+    # logging.info(f"k: {k}")
+    # logging.info(f"dim: {dim}")
+    # logging.info(f"num_queries: {num_queries}")
+    # logging.info(f"mixtures_ratio: {mixtures_ratio}")
 
     # idx_k: k for each index search
     # idx_k = (k // nprobe) + k
@@ -88,4 +92,5 @@ if __name__ == "__main__":
     print(file_idx_matrix)
 
     print(f"Search time: {qb_runtime:.8f}s")
-    logging.info(f"Search time: {qb_runtime}s")
+    # logging.info(f"Search time: {qb_runtime}s")
+    logging.info(f"batch_completed,{qb_runtime:.8f}s,nan")
