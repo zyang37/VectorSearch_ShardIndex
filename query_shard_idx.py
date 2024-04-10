@@ -9,12 +9,11 @@ import logging
 import argparse
 import numpy as np
 
+from utils.index_store import IndexStore
 from utils.dispatcher import Dispatcher
-from utils.vdb_utils import load_index, random_floats, random_normal_vectors, query_index_file, random_queries_mix_distribs
+from utils.vdb_utils import random_floats, random_normal_vectors, query_index_file, random_queries_mix_distribs
 from utils.search_by_topology import search_outterloop_index, search_outterloop_query, reverse_stopology
 
-# fix random seed
-# np.random.seed(0)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Query shard index for vector database")
@@ -24,19 +23,21 @@ if __name__ == "__main__":
     parser.add_argument("-nq", "--num_query", default=5, help="number of queries", type=int,)
     parser.add_argument("-mr", "--mixtures_ratio", default=0., help="mixtures ratio for random queries", type=float,)
     parser.add_argument("--log", required=False, default="logs/app.log", help="log file", type=str,)
+    parser.add_argument("-mi", "--max_index_store", default=1000, help="max indexes to store", type=int,)
+    parser.add_argument("-st", "--search_topology", default="index", 
+                        help="search topology: <index> or <query>", type=str,)
     # hardcode args for now
     parser.add_argument("-d", "--dim", default=128, help="dimension of embeddings", type=int,)
+    parser.add_argument("--seed", default=None, help="random seed", type=int,)
     args = parser.parse_args()
 
     os.makedirs("logs", exist_ok=True)
     # Note it will keep appending to the log file if file exists!
     # logging.basicConfig(filename='logs/app.log', level=logging.INFO, format='%(asctime)s.%(msecs)03d,%(levelname)s,%(message)s')
     time_format = "%Y-%m-%d %H:%M:%S"
-    logging.basicConfig(filename='logs/app.log', level=logging.INFO, format='%(asctime)s,%(message)s', datefmt=time_format)
+    logging.basicConfig(filename=args.log, level=logging.INFO, format='%(asctime)s,%(message)s', datefmt=time_format)
 
     # headers: timestamp,action,latency,args
-
-    # args
     print(args)
     index_root = args.idx_root
     nprobe = args.nprobe
@@ -44,6 +45,12 @@ if __name__ == "__main__":
     dim = args.dim
     num_queries = args.num_query
     mixtures_ratio = args.mixtures_ratio
+    max_index_store = args.max_index_store
+    search_topology = args.search_topology
+    seed = args.seed
+
+    if seed:
+        np.random.seed(seed)
 
     # log cfg 
     # logging.info(f"Index root: {index_root}")
@@ -72,12 +79,17 @@ if __name__ == "__main__":
     # queries = random_normal_vectors(num_queries, dim, random_mean[0], random_std[0])
     queries = random_queries_mix_distribs(num_queries, dim, mixtures_ratio=mixtures_ratio, low=-1, high=.1)
 
-    dispatcher = Dispatcher(centriod_idx_paths, queries, nprobe)
+
+    index_store = IndexStore(max_indexes=max_index_store)
+    dispatcher = Dispatcher(centriod_idx_paths, queries, nprobe, index_store)
     rstopology = dispatcher.create_search_outterloop_index_topology()
 
     # search queries
     start_time = time.perf_counter()
-    D_matrix, I_matrix, file_idx_matrix = search_outterloop_index(rstopology, queries, idx_k, k, idx_paths)
+    if "index" in search_topology.lower():
+        D_matrix, I_matrix, file_idx_matrix = search_outterloop_index(rstopology, queries, idx_k, k, idx_paths, index_store)    
+    else:
+        D_matrix, I_matrix, file_idx_matrix = search_outterloop_query(reverse_stopology(rstopology), queries, idx_k, k, idx_paths, index_store)
     end_time = time.perf_counter()
     qb_runtime = end_time - start_time
 

@@ -4,6 +4,7 @@ This file contains utility functions for VectorDB.
 
 import faiss
 import numpy as np
+
 from utils.logger import Logger
 
 # fix random seed
@@ -80,16 +81,18 @@ def random_queries(num_queries, dim):
 def save_index(index, index_path):
     faiss.write_index(index, index_path)
 
-@Logger.log_index_load_time
-def load_index(index_path):
-    return faiss.read_index(index_path)
+# @Logger.log_index_load_time
+# def load_index(index_path):
+#     # NOT used now, function integrated in the IndexStore class
+#     return faiss.read_index(index_path)
 
 @Logger.log_index_search_time
 def query_index(index, queries, k):
     D, I = index.search(queries, k)
     return D, I
 
-def query_index_file(index_path, queries, k):
-    index = load_index(index_path)
+def query_index_file(index_path, queries, k, index_store):
+    # index = load_index(index_path)
+    index = index_store.get_index(index_path)
     D, I = query_index(index, queries, k)
     return D, I
