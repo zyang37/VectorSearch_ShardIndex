@@ -24,7 +24,7 @@ def reverse_stopology(stopology):
                 reverse_dict[val].append(key)
     return reverse_dict
 
-def search_outterloop_query(stopology, queries, idx_k, k, idx_paths):
+def search_outterloop_query(stopology, queries, idx_k, k, idx_paths, index_store):
     '''
     Search a batch of queries: looping over queries 
 
@@ -50,7 +50,7 @@ def search_outterloop_query(stopology, queries, idx_k, k, idx_paths):
 
         # loop over idxs for each query
         for j, file_idx in enumerate(idxs):
-            D, I = query_index_file(idx_paths[file_idx], query, idx_k)
+            D, I = query_index_file(idx_paths[file_idx], query, idx_k, index_store)
             # make file_idx_matrix
             file_idx_m = np.ones_like(D) * file_idx
             D_concat = np.concatenate((D_concat, D), axis=1) if D_concat.size else D
@@ -89,7 +89,7 @@ def batch_queries_by_stopology(stopology, queries):
         query_batch_dict[idx] = query_batch
     return query_batch_dict
 
-def search_outterloop_index(stopology, queries, idx_k, k, idx_paths):
+def search_outterloop_index(stopology, queries, idx_k, k, idx_paths, index_store):
     '''
     Search a batch of index: looping over index shards
 
@@ -113,7 +113,7 @@ def search_outterloop_index(stopology, queries, idx_k, k, idx_paths):
         # loop over q_idxs for each index
         query_batch = stopology_queries_dict[file_idx]
         # query_batch_order = q_idxs
-        D, I = query_index_file(idx_paths[file_idx], query_batch, idx_k)
+        D, I = query_index_file(idx_paths[file_idx], query_batch, idx_k, index_store)
         file_idx_m = np.ones_like(D) * file_idx
         
         # merge and compare results in final matrix (D), then save top k
