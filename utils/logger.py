@@ -22,7 +22,7 @@ class Logger:
             start_time = time.perf_counter()
             result = func(*args, **kwargs)
             elapsed_time = time.perf_counter() - start_time
-            logging.info(f"Func:'{func.__name__}',{elapsed_time:.8f}s,nan")
+            logging.info(f"Func:'{func.__name__}',{elapsed_time:.8f}s,{args[-1]}")
             return result
         return wrapper
 
