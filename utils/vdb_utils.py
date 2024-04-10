@@ -87,12 +87,12 @@ def save_index(index, index_path):
 #     return faiss.read_index(index_path)
 
 @Logger.log_index_search_time
-def query_index(index, queries, k):
+def query_index(index, queries, k, index_path=None):
     D, I = index.search(queries, k)
     return D, I
 
 def query_index_file(index_path, queries, k, index_store):
     # index = load_index(index_path)
     index = index_store.get_index(index_path)
-    D, I = query_index(index, queries, k)
+    D, I = query_index(index, queries, k, index_path)
     return D, I

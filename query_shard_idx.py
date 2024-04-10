@@ -104,5 +104,4 @@ if __name__ == "__main__":
     print(file_idx_matrix)
 
     print(f"Search time: {qb_runtime:.8f}s")
-    # logging.info(f"Search time: {qb_runtime}s")
-    logging.info(f"batch_completed,{qb_runtime:.8f}s,nan")
+    # logging.info(f"batch_completed_{num_queries},{qb_runtime:.8f}s,nan")
