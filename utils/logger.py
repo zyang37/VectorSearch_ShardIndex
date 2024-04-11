@@ -4,6 +4,8 @@ import time
 class Logger:
     '''
     A class to log the time taken by a function to execute
+
+    Log headers: timestamp, action, latency, index_name, processed_queries
     '''
     @staticmethod
     def log_index_load_time(func):
@@ -11,7 +13,7 @@ class Logger:
             start_time = time.perf_counter()
             result = func(*args, **kwargs)
             elapsed_time = time.perf_counter() - start_time
-            logging.info(f"Func:'{func.__name__}',{elapsed_time:.8f}s,{args[1]}")
+            logging.info(f"Func:'{func.__name__}',{elapsed_time:.8f}s,{args[1]},0")
             return result
         return wrapper
     
@@ -22,7 +24,7 @@ class Logger:
             start_time = time.perf_counter()
             result = func(*args, **kwargs)
             elapsed_time = time.perf_counter() - start_time
-            logging.info(f"Func:'{func.__name__}',{elapsed_time:.8f}s,{args[-1]}")
+            logging.info(f"Func:'{func.__name__}',{elapsed_time:.8f}s,{args[-1]},{args[1].shape[0]}")
             return result
         return wrapper
 
