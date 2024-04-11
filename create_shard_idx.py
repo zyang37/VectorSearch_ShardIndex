@@ -49,7 +49,7 @@ if __name__ == "__main__":
     parser.add_argument("-idx", "--idx_root", required=False, default="shards/idxs/", help="dir to index files", type=str,)
     # args for random generation
     parser.add_argument("-d", "--dim", default=128, help="dimension of embeddings", type=int,)
-    parser.add_argument("-ns", "--num_shards", default=100, help="number of shards", type=int,)
+    parser.add_argument("-ns", "--num_shards", default=1000, help="number of shards", type=int,)
     args = parser.parse_args()
 
     # args for random generation
@@ -68,11 +68,11 @@ if __name__ == "__main__":
     
     # create npy files
     for i in range(num_shards):
-        random_mean = random_floats(1, low=-1, high=1)
+        random_mean = random_floats(1, low=-2, high=2)
         # random_std = random_floats(1)
         # random_mean = [0]
         random_std = [0.5]
-        embeds = random_normal_vectors(100000, dim, random_mean[0], random_std[0])
+        embeds = random_normal_vectors(10000, dim, random_mean[0], random_std[0])
         embeds_centroids[i] = compute_embeds_avgs(embeds)
         save_np_to_file(os.path.join(npy_root, f"embeds_{i}.npy"), embeds)
         print(f"embeds_{i}.npy created")
