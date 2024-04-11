@@ -5,8 +5,12 @@ Search topology 1: {query_idx1: [idx1, idx2...]} # naive search, can serve as a 
 Search topology 2: {idx1: [query_idx1, query_idx2...]} # intellegent batching
 '''
 
+import asyncio
+
+import faiss
 import numpy as np
 from utils.vdb_utils import query_index_file
+from utils.logger import Logger
 
 # fix random seed
 # np.random.seed(0)
@@ -113,6 +117,68 @@ def search_outterloop_index(stopology, queries, idx_k, k, idx_paths, index_store
         # loop over q_idxs for each index
         query_batch = stopology_queries_dict[file_idx]
         # query_batch_order = q_idxs
+        D, I = query_index_file(idx_paths[file_idx], query_batch, idx_k, index_store)
+        file_idx_m = np.ones_like(D) * file_idx
+        
+        # merge and compare results in final matrix (D), then save top k
+        prev_D = final_D_matrix[q_idxs]
+        prev_I = final_I_matrix[q_idxs]
+        prev_file_idx = final_file_idx_matrix[q_idxs]
+        # merge and sort
+        D_concat = np.concatenate((prev_D, D), axis=1)
+        I_concat = np.concatenate((prev_I, I), axis=1)
+        file_idx_concat = np.concatenate((prev_file_idx, file_idx_m), axis=1)
+        # sort
+        sort_idx = np.argsort(D_concat, axis=1)
+        D_concat = np.take_along_axis(D_concat, sort_idx, axis=1)
+        I_concat = np.take_along_axis(I_concat, sort_idx, axis=1)
+        file_idx_concat = np.take_along_axis(file_idx_concat, sort_idx, axis=1)
+        # update final matrix with top k
+        final_D_matrix[q_idxs] = D_concat[:, :k]
+        final_I_matrix[q_idxs] = I_concat[:, :k]
+        final_file_idx_matrix[q_idxs] = file_idx_concat[:, :k]
+    return final_D_matrix, final_I_matrix.astype(int), final_file_idx_matrix.astype(int)
+
+
+def search_outterloop_index_async_runner(stopology, queries, idx_k, k, idx_paths, index_store):
+    D, I, filep = asyncio.run(search_outterloop_index_async(stopology, queries, idx_k, k, idx_paths, index_store))
+    return D, I, filep
+
+async def load_index_async(index_path):
+    # print(f"Loading index: {index_path}")
+    return index_path, faiss.read_index(index_path)
+
+async def search_outterloop_index_async(stopology, queries, idx_k, k, idx_paths, index_store):
+    '''
+    Search a batch of index: looping over index shards (async). Overlapping IO and computation.
+
+    args:
+        - search topology: {index1: [q1,q2...]}
+        - queries: (num, dim)
+        - idx_k: k for each index search
+        - k: top k results (global)
+        - idx_paths: list of index paths
+    '''
+    # result_matrix: init ndarray with shape (num_queries, k)
+    final_D_matrix = np.ones((queries.shape[0], k)) * np.inf
+    final_I_matrix = np.zeros((queries.shape[0], k))
+    final_file_idx_matrix = np.zeros((queries.shape[0], k))
+
+    # batch queries by stopology: {idx1, [q1_data, q2_data...]}
+    stopology_queries_dict = batch_queries_by_stopology(stopology, queries)
+
+    stopology_queries_list = list(stopology.items())
+    next_load_task = asyncio.create_task(load_index_async(idx_paths[stopology_queries_list[0][0]]))
+
+    # loop over index shards
+    for i, (file_idx, q_idxs) in enumerate(stopology_queries_list):
+        idx_name, loaded_idx = await next_load_task
+        index_store.add_index(idx_name, loaded_idx)
+
+        query_batch = stopology_queries_dict[file_idx]
+        if i+1 < len(stopology_queries_list):
+            next_load_task = asyncio.create_task(load_index_async(idx_paths[stopology_queries_list[i+1][0]]))
+
         D, I = query_index_file(idx_paths[file_idx], query_batch, idx_k, index_store)
         file_idx_m = np.ones_like(D) * file_idx
         

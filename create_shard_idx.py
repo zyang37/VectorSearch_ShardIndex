@@ -50,11 +50,13 @@ if __name__ == "__main__":
     # args for random generation
     parser.add_argument("-d", "--dim", default=128, help="dimension of embeddings", type=int,)
     parser.add_argument("-ns", "--num_shards", default=1000, help="number of shards", type=int,)
+    parser.add_argument("--cluster_size", default=10000, help="number of embeddings per shard", type=int,)
     args = parser.parse_args()
 
     # args for random generation
     dim = args.dim
     num_shards = args.num_shards
+    cluster_size = args.cluster_size
 
     npy_root = args.npy_root
     index_root = args.idx_root
@@ -68,11 +70,11 @@ if __name__ == "__main__":
     
     # create npy files
     for i in range(num_shards):
-        random_mean = random_floats(1, low=-2, high=2)
+        random_mean = random_floats(1, low=-1, high=1)
         # random_std = random_floats(1)
         # random_mean = [0]
         random_std = [0.5]
-        embeds = random_normal_vectors(10000, dim, random_mean[0], random_std[0])
+        embeds = random_normal_vectors(cluster_size, dim, random_mean[0], random_std[0])
         embeds_centroids[i] = compute_embeds_avgs(embeds)
         save_np_to_file(os.path.join(npy_root, f"embeds_{i}.npy"), embeds)
         print(f"embeds_{i}.npy created")

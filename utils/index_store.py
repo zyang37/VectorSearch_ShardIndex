@@ -5,9 +5,7 @@ Index store class
 '''
 
 import faiss
-
 from utils.logger import Logger
-
 
 class IndexStore:
     '''
