@@ -12,7 +12,7 @@ import numpy as np
 from utils.index_store import IndexStore
 from utils.dispatcher import Dispatcher
 from utils.vdb_utils import random_floats, random_normal_vectors, query_index_file, random_queries_mix_distribs
-from utils.search_by_topology import search_outterloop_index, search_outterloop_query, reverse_stopology
+from utils.search_by_topology import search_outterloop_index, search_outterloop_query, search_outterloop_index_async_runner, reverse_stopology
 
 
 if __name__ == "__main__":
@@ -25,7 +25,7 @@ if __name__ == "__main__":
     parser.add_argument("--log", required=False, default="logs/app.log", help="log file", type=str,)
     parser.add_argument("-mi", "--max_index_store", default=1000, help="max indexes to store", type=int,)
     parser.add_argument("-st", "--search_topology", default="index", 
-                        help="search topology: <index> or <query>", type=str,)
+                        help="search topology: <index>, <query> or <index_async>", type=str,)
     # hardcode args for now
     parser.add_argument("-d", "--dim", default=128, help="dimension of embeddings", type=int,)
     parser.add_argument("--seed", default=None, help="random seed", type=int,)
@@ -49,7 +49,7 @@ if __name__ == "__main__":
     search_topology = args.search_topology
     seed = args.seed
 
-    if seed:
+    if seed is not None:
         np.random.seed(seed)
 
     # log cfg 
@@ -76,8 +76,8 @@ if __name__ == "__main__":
     # Generate random queries from normal distribution with mean 0 and std 1
     # random_mean = random_floats(1, low=-1, high=1)
     # random_std = [0.5]
-    # queries = random_normal_vectors(num_queries, dim, random_mean[0], random_std[0])
-    queries = random_queries_mix_distribs(num_queries, dim, mixtures_ratio=mixtures_ratio, low=-1, high=.1)
+    # queries = random_normal_vectors(num_queries, dim, random_mean[0], random_std[0], seed=seed)
+    queries = random_queries_mix_distribs(num_queries, dim, mixtures_ratio=mixtures_ratio, low=-1, high=.1, seed=seed)
 
 
     index_store = IndexStore(max_indexes=max_index_store)
@@ -86,10 +86,12 @@ if __name__ == "__main__":
 
     # search queries
     start_time = time.perf_counter()
-    if "index" in search_topology.lower():
+    if "index" == search_topology.lower():
         D_matrix, I_matrix, file_idx_matrix = search_outterloop_index(rstopology, queries, idx_k, k, idx_paths, index_store)    
-    else:
+    elif "query" == search_topology.lower():
         D_matrix, I_matrix, file_idx_matrix = search_outterloop_query(reverse_stopology(rstopology), queries, idx_k, k, idx_paths, index_store)
+    elif "index_async" == search_topology.lower():
+        D_matrix, I_matrix, file_idx_matrix = search_outterloop_index_async_runner(rstopology, queries, idx_k, k, idx_paths, index_store)
     end_time = time.perf_counter()
     qb_runtime = end_time - start_time
 

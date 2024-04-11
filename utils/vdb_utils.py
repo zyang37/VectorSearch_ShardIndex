@@ -10,14 +10,16 @@ from utils.logger import Logger
 # fix random seed
 # np.random.seed(0)
 
-def random_floats(size, low=0, high=1):
+def random_floats(size, low=0, high=1, seed=None):
+    if seed is not None: np.random.seed(seed)
     return [np.random.uniform(low, high) for _ in range(size)]
 
-def random_normal_vectors(num_embeds, dim, mean=0, std=1):
+def random_normal_vectors(num_embeds, dim, mean=0, std=1, seed=None):
+    if seed is not None: np.random.seed(seed)
     data = np.random.normal(mean, std, (num_embeds, dim)).astype('float32')
     return data
 
-def random_queries_mix_distribs(num_queries, dim, mixtures_ratio=1, low=-1, high=1):
+def random_queries_mix_distribs(num_queries, dim, mixtures_ratio=1, low=-1, high=1, seed=None):
     '''
     This function generates random query batch where queries are drawn from a mix of distributions.
 
@@ -31,6 +33,8 @@ def random_queries_mix_distribs(num_queries, dim, mixtures_ratio=1, low=-1, high
             - 1 means every queries are drawn from different distributions.
             - 0.1 means per 10% of the query_batch are drawn from one distribution. 
     '''
+    if seed is not None: np.random.seed(seed)
+
     queries = np.zeros((num_queries, dim))
 
     # compute the number of queries for each distribution
@@ -58,22 +62,26 @@ def random_queries_mix_distribs(num_queries, dim, mixtures_ratio=1, low=-1, high
             queries[i] = random_normal_vectors(1, dim, random_mean, random_std)
     return queries
 
-def random_embeddings(num_embeds, dim):
+def random_embeddings(num_embeds, dim, seed=None):
     '''
     Note: use random_normal_vectors for more controled random embeddings!
 
     Create random embeddings
     '''
+    if seed is not None: np.random.seed(seed)
+
     data = np.random.random((num_embeds, dim)).astype('float32')
     # data[:, 0] += np.arange(num_embeds) / 1000.
     return data
 
-def random_queries(num_queries, dim):
+def random_queries(num_queries, dim, seed=None):
     '''
     Note: use random_normal_vectors for more controled random embeddings!
 
     Create random queries
     '''
+    if seed is not None: np.random.seed(seed)
+
     queries = np.random.random((num_queries, dim)).astype('float32')
     # queries[:, 0] += np.arange(num_queries) / 1000.
     return queries
