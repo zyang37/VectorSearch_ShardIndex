@@ -1,7 +1,8 @@
 from flask import Flask, request, jsonify
 import numpy as np
 
-app = Flask(__name__)
+# app = Flask(__name__)
+app = Flask("Vector_search server")
 
 def process_array(arr):
     """
@@ -15,7 +16,7 @@ def process_array(arr):
     """
     return arr * 10
 
-@app.route('/process_array', methods=['POST'])
+@app.route('/vector_search', methods=['POST'])
 def handle_array():
     if not request.json or 'array' not in request.json:
         return jsonify({'error': 'Bad request, JSON with "array" key required'}), 400
@@ -23,7 +24,7 @@ def handle_array():
     try:
         # Convert the JSON array to a NumPy array
         input_array = np.array(request.json['array'])
-        print("Received array from client:", input_array)
+        print("Received array from client with shape: {}\n".format(input_array.shape))
         
         # Process the array
         processed_array = process_array(input_array)
