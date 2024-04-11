@@ -1,5 +1,5 @@
 
-# Vecter Search for Large Sharded Index
+# Serving Vecter Search for Large Datasets with Index Shards
 
 ## Generate the shards
 ```
