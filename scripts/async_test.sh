@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # define variables for the script
-NUM_QUERIES=10000
+NUM_QUERIES=12000
 K=10
 NPROBE=10
 MAX_INDEX_STORE=1000
