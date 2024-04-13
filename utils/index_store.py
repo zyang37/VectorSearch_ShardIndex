@@ -40,8 +40,9 @@ class ThreadDataLoader(threading.Thread):
 
     def fetch_data(self, file_path):
         # Add index to the store
-        index = self.index_store.load_index(file_path)
-        self.index_store.add_index(file_path, index)
+        # index = self.index_store.load_index(file_path)
+        # self.index_store.add_index(file_path, index)
+        self.index_store.add_index_from_path(file_path)
         self.file_paths.remove(file_path)
 
     def pause_loading(self):

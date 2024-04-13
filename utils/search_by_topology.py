@@ -6,6 +6,7 @@ Search topology 2: {idx1: [query_idx1, query_idx2...]} # intellegent batching
 '''
 
 # import asyncio
+import time
 
 import numpy as np
 
@@ -171,7 +172,7 @@ def search_outterloop_index_async(stopology, queries, idx_k, k, idx_paths, index
         # if index is loading wait
         while idx_paths[file_idx] in index_store.indexes and index_store.indexes[idx_paths[file_idx]]=="loading":
             # print("waiting for index to load")
-            continue
+            time.sleep(0.000001)
 
         D, I = query_index_file(idx_paths[file_idx], query_batch, idx_k, index_store)
         index_store.remove_index(idx_paths[file_idx])
