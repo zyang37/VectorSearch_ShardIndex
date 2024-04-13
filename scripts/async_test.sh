@@ -14,7 +14,7 @@ python query_shard_idx.py -nq $NUM_QUERIES -k $K --nprobe $NPROBE \
     --log logs/st_index_async_1_batch.log \
     --seed 0
 
-sleep 2
+sleep 1
 
 python query_shard_idx.py -nq $NUM_QUERIES -k $K --nprobe $NPROBE \
     --search_topology index \
@@ -23,7 +23,7 @@ python query_shard_idx.py -nq $NUM_QUERIES -k $K --nprobe $NPROBE \
     --log logs/st_index_1_batch.log \
     --seed 0
 
-sleep 2
+sleep 1
 
 python query_shard_idx.py -nq $NUM_QUERIES -k $K --nprobe $NPROBE \
     --search_topology query \

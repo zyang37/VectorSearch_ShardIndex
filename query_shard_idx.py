@@ -18,7 +18,7 @@ from utils.vdb_utils import random_floats, random_normal_vectors, query_index_fi
 from utils.search_by_topology import search_outterloop_index, search_outterloop_query, search_outterloop_index_async, query_to_index_stopology
 
 
-faiss.omp_set_num_threads(2)
+faiss.omp_set_num_threads(1)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Query shard index for vector database")
@@ -99,6 +99,8 @@ if __name__ == "__main__":
         D_matrix, I_matrix, file_idx_matrix = search_outterloop_index(rstopology, queries, idx_k, k, idx_paths, index_store)
     elif "index_async" == search_topology.lower():
         rstopology = dispatcher.create_search_outterloop_index_topology()
+        # sort rs topology by length of values
+        rstopology = {k: v for k, v in sorted(rstopology.items(), key=lambda item: len(item[1]), reverse=True)}
         index_loader = ThreadDataLoader(index_store, idx_paths, rstopology)
         index_loader.start()
         D_matrix, I_matrix, file_idx_matrix = search_outterloop_index_async(rstopology, queries, idx_k, k, idx_paths, index_store)
