@@ -38,27 +38,26 @@ def random_queries_mix_distribs(num_queries, dim, mixtures_ratio=1, low=-1, high
     queries = np.zeros((num_queries, dim))
 
     # compute the number of queries for each distribution
+    random_std = [0.5]
+
     if mixtures_ratio == 0: 
         random_mean = random_floats(1, low, high)[0]
-        # random_std = random_floats(1, low, high)[0]
-        random_std = [0.5]
         return random_normal_vectors(num_queries, dim, random_mean, random_std)
     elif mixtures_ratio == 1:
         for i in range(num_queries):
             random_mean = random_floats(1, low, high)[0]
-            # random_std = random_floats(1, low, high)[0]
-            random_std = [0.5]
             queries[i] = random_normal_vectors(1, dim, random_mean, random_std)
         return queries
     else:
-        # generate random queries per sample_size
-        sample_size = int(num_queries * mixtures_ratio)
-        for i in range(num_queries):
-            if i % sample_size == 0:
-                random_mean = random_floats(1, low, high)[0]
-                # random_std = random_floats(1, low, high)[0]
-                random_std = [0.5]
-                # print(random_mean)
+        # draw some queries from different distributions
+        num_query_from_diff_distr = int(num_queries * mixtures_ratio)
+        for i in range(num_query_from_diff_distr):
+            random_mean = random_floats(1, low, high)[0]
+            queries[i] = random_normal_vectors(1, dim, random_mean, random_std)
+
+        # draw the rest of the queries from the same distribution
+        random_mean = random_floats(1, low, high)[0]
+        for i in range(num_query_from_diff_distr, num_queries):
             queries[i] = random_normal_vectors(1, dim, random_mean, random_std)
     return queries
 

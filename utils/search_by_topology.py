@@ -171,7 +171,6 @@ def search_outterloop_index_async(stopology, queries, idx_k, k, idx_paths, index
         
         # if index is loading wait
         while idx_paths[file_idx] in index_store.indexes and index_store.indexes[idx_paths[file_idx]]=="loading":
-            # print("waiting for index to load")
             time.sleep(0.000001)
 
         D, I = query_index_file(idx_paths[file_idx], query_batch, idx_k, index_store)

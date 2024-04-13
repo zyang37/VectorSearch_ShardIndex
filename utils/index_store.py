@@ -12,7 +12,6 @@ import faiss
 from utils.logger import Logger
 
 
-
 class ThreadDataLoader(threading.Thread):
     def __init__(self, Index_store, all_file_paths:list, stopology):
         super().__init__()
@@ -57,6 +56,60 @@ class ThreadDataLoader(threading.Thread):
         self.keep_running = False
         self.resume_loading()  # If it's paused, we need to resume it to allow it to exit
         # print("Stopping the loader...")
+
+class IndexStore:
+    '''
+    A class to store indexes in memory for faster access
+    '''
+    def __init__(self, max_indexes=1000):
+        self.indexes = {}
+        self.num_indexes = 0
+        self.max_indexes = max_indexes
+
+    @Logger.log_index_load_time
+    def load_index(self, index_path):
+        # update index status, 1 means it is currently loading
+        self.indexes[index_path] = "loading"
+        return faiss.read_index(index_path)
+
+    def add_index_from_path(self, index_path):
+        # Remove the first index if the number of indexes exceeds the max indexes
+        if self.at_capacity():
+            self.swap_index()
+        self.indexes[index_path] = self.load_index(index_path)
+        self.num_indexes += 1
+
+    def add_index(self, index_path, index):
+        # Remove the first index if the number of indexes exceeds the max indexes
+        if self.at_capacity():
+            # self.remove_index(list(self.indexes.keys())[0])
+            self.swap_index()
+        self.indexes[index_path] = index
+        self.num_indexes += 1
+
+    def get_index(self, index_path):
+        # Load the index if it is not in the store
+        if index_path not in self.indexes:
+            # print("NOT in store!")
+            index = self.load_index(index_path)
+            # Add the index to the store
+            self.add_index(index_path, index)
+        return self.indexes[index_path]
+
+    def remove_index(self, index_path):
+        del self.indexes[index_path]
+        self.num_indexes -= 1
+
+    def at_capacity(self):
+        return self.num_indexes >= self.max_indexes
+    
+    # NEED TO UPDATE!!!
+    def swap_index(self):
+        # get a key to remove, and call remove_index
+        # Currently, remove the first index
+        remove_ids_key = list(self.indexes.keys())[0]
+        self.remove_index(remove_ids_key)
+
 
 
 # NOT USED SLOW
@@ -103,6 +156,7 @@ class ProcessDataLoader(multiprocessing.Process):
         self.keep_running.value = 0
         self.resume_loading()  # If it's paused, we need to resume it to allow it to exit
         # print("Stopping the loader...")
+
 
 # NOT USED
 class AsyncDataLoader:
@@ -163,57 +217,3 @@ class AsyncDataLoader:
     def resume(self):
         """Resume the background task."""
         self.pause_event.set()
-
-
-class IndexStore:
-    '''
-    A class to store indexes in memory for faster access
-    '''
-    def __init__(self, max_indexes=1000):
-        self.indexes = {}
-        self.num_indexes = 0
-        self.max_indexes = max_indexes
-
-    @Logger.log_index_load_time
-    def load_index(self, index_path):
-        # update index status, 1 means it is currently loading
-        self.indexes[index_path] = "loading"
-        return faiss.read_index(index_path)
-
-    def add_index_from_path(self, index_path):
-        # Remove the first index if the number of indexes exceeds the max indexes
-        if self.at_capacity():
-            self.swap_index()
-        self.indexes[index_path] = self.load_index(index_path)
-        self.num_indexes += 1
-
-    def add_index(self, index_path, index):
-        # Remove the first index if the number of indexes exceeds the max indexes
-        if self.at_capacity():
-            # self.remove_index(list(self.indexes.keys())[0])
-            self.swap_index()
-        self.indexes[index_path] = index
-        self.num_indexes += 1
-
-    def get_index(self, index_path):
-        # Load the index if it is not in the store
-        if index_path not in self.indexes:
-            # print("NOT in store!")
-            index = self.load_index(index_path)
-            # Add the index to the store
-            self.add_index(index_path, index)
-        return self.indexes[index_path]
-
-    def remove_index(self, index_path):
-        del self.indexes[index_path]
-        self.num_indexes -= 1
-
-    def at_capacity(self):
-        return self.num_indexes >= self.max_indexes
-    
-    # NEED TO UPDATE!!!
-    def swap_index(self):
-        # get a key to remove, and call remove_index
-        # Currently, remove the first index
-        remove_ids_key = list(self.indexes.keys())[0]
-        self.remove_index(remove_ids_key)
