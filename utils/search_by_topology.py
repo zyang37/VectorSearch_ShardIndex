@@ -5,19 +5,19 @@ Search topology 1: {query_idx1: [idx1, idx2...]} # naive search, can serve as a 
 Search topology 2: {idx1: [query_idx1, query_idx2...]} # intellegent batching
 '''
 
-import asyncio
+# import asyncio
 
-import faiss
 import numpy as np
+
 from utils.vdb_utils import query_index_file
-from utils.logger import Logger
+# from utils.index_store import AsyncDataLoader, ThreadDataLoader, ProcessDataLoader
 
 # fix random seed
 # np.random.seed(0)
 
-def reverse_stopology(stopology):
+def query_to_index_stopology(stopology):
     '''
-    This function reverse the stopology dict.
+    This function reverse the search topology from query to index.
     '''
     reverse_dict = {}
     for key, val_list in stopology.items():
@@ -110,12 +110,14 @@ def search_outterloop_index(stopology, queries, idx_k, k, idx_paths, index_store
     final_file_idx_matrix = np.zeros((queries.shape[0], k))
 
     # batch queries by stopology: {idx1, [q1_data, q2_data...]}
-    stopology_queries_dict = batch_queries_by_stopology(stopology, queries)
+    # stopology_queries_dict = batch_queries_by_stopology(stopology, queries)
 
     # loop over index shards
     for file_idx, q_idxs in stopology.items():
         # loop over q_idxs for each index
-        query_batch = stopology_queries_dict[file_idx]
+        # query_batch = stopology_queries_dict[file_idx]
+        query_batch = queries[q_idxs]
+
         # query_batch_order = q_idxs
         D, I = query_index_file(idx_paths[file_idx], query_batch, idx_k, index_store)
         file_idx_m = np.ones_like(D) * file_idx
@@ -140,15 +142,8 @@ def search_outterloop_index(stopology, queries, idx_k, k, idx_paths, index_store
     return final_D_matrix, final_I_matrix.astype(int), final_file_idx_matrix.astype(int)
 
 
-def search_outterloop_index_async_runner(stopology, queries, idx_k, k, idx_paths, index_store):
-    D, I, filep = asyncio.run(search_outterloop_index_async(stopology, queries, idx_k, k, idx_paths, index_store))
-    return D, I, filep
-
-async def load_index_async(index_path):
-    # print(f"Loading index: {index_path}")
-    return index_path, faiss.read_index(index_path)
-
-async def search_outterloop_index_async(stopology, queries, idx_k, k, idx_paths, index_store):
+def search_outterloop_index_async(stopology, queries, idx_k, k, idx_paths, index_store):
+    # print("search task is starting")
     '''
     Search a batch of index: looping over index shards (async). Overlapping IO and computation.
 
@@ -165,21 +160,21 @@ async def search_outterloop_index_async(stopology, queries, idx_k, k, idx_paths,
     final_file_idx_matrix = np.zeros((queries.shape[0], k))
 
     # batch queries by stopology: {idx1, [q1_data, q2_data...]}
-    stopology_queries_dict = batch_queries_by_stopology(stopology, queries)
-
-    stopology_queries_list = list(stopology.items())
-    next_load_task = asyncio.create_task(load_index_async(idx_paths[stopology_queries_list[0][0]]))
+    # stopology_queries_dict = batch_queries_by_stopology(stopology, queries)
 
     # loop over index shards
-    for i, (file_idx, q_idxs) in enumerate(stopology_queries_list):
-        idx_name, loaded_idx = await next_load_task
-        index_store.add_index(idx_name, loaded_idx)
-
-        query_batch = stopology_queries_dict[file_idx]
-        if i+1 < len(stopology_queries_list):
-            next_load_task = asyncio.create_task(load_index_async(idx_paths[stopology_queries_list[i+1][0]]))
+    for file_idx, q_idxs in stopology.items():
+        # loop over q_idxs for each index
+        # query_batch = stopology_queries_dict[file_idx]
+        query_batch = queries[q_idxs]
+        
+        # if index is loading wait
+        while idx_paths[file_idx] in index_store.indexes and index_store.indexes[idx_paths[file_idx]]=="loading":
+            # print("waiting for index to load")
+            continue
 
         D, I = query_index_file(idx_paths[file_idx], query_batch, idx_k, index_store)
+        index_store.remove_index(idx_paths[file_idx])
         file_idx_m = np.ones_like(D) * file_idx
         
         # merge and compare results in final matrix (D), then save top k

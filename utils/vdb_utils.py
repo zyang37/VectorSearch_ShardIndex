@@ -99,6 +99,7 @@ def query_index(index, queries, k, index_path=None):
     D, I = index.search(queries, k)
     return D, I
 
+#TODO: update ranking here, read trace will be too slow!!!
 def query_index_file(index_path, queries, k, index_store):
     # index = load_index(index_path)
     index = index_store.get_index(index_path)

@@ -4,16 +4,21 @@ Generate random queries and query shard index files
 
 import os
 import time
-# import faiss
+import faiss
+# import asyncio
 import logging
 import argparse
+import multiprocessing
+
 import numpy as np
 
-from utils.index_store import IndexStore
+from utils.index_store import IndexStore, ThreadDataLoader, ProcessDataLoader
 from utils.dispatcher import Dispatcher
 from utils.vdb_utils import random_floats, random_normal_vectors, query_index_file, random_queries_mix_distribs
-from utils.search_by_topology import search_outterloop_index, search_outterloop_query, search_outterloop_index_async_runner, reverse_stopology
+from utils.search_by_topology import search_outterloop_index, search_outterloop_query, search_outterloop_index_async, query_to_index_stopology
 
+
+faiss.omp_set_num_threads(2)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Query shard index for vector database")
@@ -35,7 +40,7 @@ if __name__ == "__main__":
     # Note it will keep appending to the log file if file exists!
     # logging.basicConfig(filename='logs/app.log', level=logging.INFO, format='%(asctime)s.%(msecs)03d,%(levelname)s,%(message)s')
     time_format = "%Y-%m-%d %H:%M:%S"
-    logging.basicConfig(filename=args.log, level=logging.INFO, format='%(asctime)s,%(message)s', datefmt=time_format)
+    logging.basicConfig(filename=args.log, level=logging.INFO, format="%(asctime)s.%(msecs)03d,%(message)s", datefmt=time_format)
 
     # headers: timestamp,action,latency,args
     print(args)
@@ -52,7 +57,6 @@ if __name__ == "__main__":
     if seed is not None:
         np.random.seed(seed)
 
-    # log cfg 
     # logging.info(f"Index root: {index_root}")
     # logging.info(f"nprobe: {nprobe}")
     # logging.info(f"k: {k}")
@@ -82,18 +86,29 @@ if __name__ == "__main__":
 
     index_store = IndexStore(max_indexes=max_index_store)
     dispatcher = Dispatcher(centriod_idx_paths, queries, nprobe, index_store)
-    rstopology = dispatcher.create_search_outterloop_index_topology()
 
-    # search queries
+    # inference
     start_time = time.perf_counter()
-    if "index" == search_topology.lower():
-        D_matrix, I_matrix, file_idx_matrix = search_outterloop_index(rstopology, queries, idx_k, k, idx_paths, index_store)    
-    elif "query" == search_topology.lower():
-        D_matrix, I_matrix, file_idx_matrix = search_outterloop_query(reverse_stopology(rstopology), queries, idx_k, k, idx_paths, index_store)
+    
+    if "query" == search_topology.lower():
+        stopology = dispatcher.create_search_outterloop_query_topology()
+        D_matrix, I_matrix, file_idx_matrix = search_outterloop_query(stopology, queries, idx_k, k, idx_paths, index_store)
+    elif "index" == search_topology.lower():
+        # rstopology = query_to_index_stopology(stopology)
+        rstopology = dispatcher.create_search_outterloop_index_topology()
+        D_matrix, I_matrix, file_idx_matrix = search_outterloop_index(rstopology, queries, idx_k, k, idx_paths, index_store)
     elif "index_async" == search_topology.lower():
-        D_matrix, I_matrix, file_idx_matrix = search_outterloop_index_async_runner(rstopology, queries, idx_k, k, idx_paths, index_store)
+        rstopology = dispatcher.create_search_outterloop_index_topology()
+        index_loader = ThreadDataLoader(index_store, idx_paths, rstopology)
+        index_loader.start()
+        D_matrix, I_matrix, file_idx_matrix = search_outterloop_index_async(rstopology, queries, idx_k, k, idx_paths, index_store)
+        index_loader.stop_loading()
+
     end_time = time.perf_counter()
     qb_runtime = end_time - start_time
+
+    if "index_async" == search_topology.lower():
+        index_loader.join()
 
     print()
     print("Distances")
