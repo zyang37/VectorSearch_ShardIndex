@@ -11,14 +11,16 @@ import argparse
 import multiprocessing
 
 import numpy as np
+from pprint import pprint
 
 from utils.index_store import IndexStore, ThreadDataLoader, ProcessDataLoader
 from utils.dispatcher import Dispatcher
+from utils.index_manager import IndexManager
 from utils.vdb_utils import random_floats, random_normal_vectors, query_index_file, random_queries_mix_distribs
 from utils.search_by_topology import search_outterloop_index, search_outterloop_query, search_outterloop_index_async, query_to_index_stopology
 
 
-faiss.omp_set_num_threads(1)
+faiss.omp_set_num_threads(3)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Query shard index for vector database")
@@ -34,6 +36,7 @@ if __name__ == "__main__":
     # hardcode args for now
     parser.add_argument("-d", "--dim", default=128, help="dimension of embeddings", type=int,)
     parser.add_argument("--seed", default=None, help="random seed", type=int,)
+    parser.add_argument("--verbose", action="store_true", help="increase output verbosity")
     args = parser.parse_args()
 
     os.makedirs("logs", exist_ok=True)
@@ -43,7 +46,8 @@ if __name__ == "__main__":
     logging.basicConfig(filename=args.log, level=logging.INFO, format="%(asctime)s.%(msecs)03d,%(message)s", datefmt=time_format)
 
     # headers: timestamp,action,latency,args
-    print(args)
+    if args.verbose:
+        print(args)
     index_root = args.idx_root
     nprobe = args.nprobe
     k = args.k
@@ -81,11 +85,11 @@ if __name__ == "__main__":
     # random_mean = random_floats(1, low=-1, high=1)
     # random_std = [0.5]
     # queries = random_normal_vectors(num_queries, dim, random_mean[0], random_std[0], seed=seed)
-    queries = random_queries_mix_distribs(num_queries, dim, mixtures_ratio=mixtures_ratio, low=-1, high=.1, seed=seed)
+    queries = random_queries_mix_distribs(num_queries, dim, mixtures_ratio=mixtures_ratio, low=-1, high=1, seed=seed)
 
-
-    index_store = IndexStore(max_indexes=max_index_store)
-    dispatcher = Dispatcher(centriod_idx_paths, queries, nprobe, index_store)
+    index_manager = IndexManager()
+    index_store = IndexStore(max_indexes=max_index_store, index_manager=index_manager)
+    dispatcher = Dispatcher(centriod_idx_paths, queries, nprobe, index_store, verbose=args.verbose)
 
     # inference
     start_time = time.perf_counter()
@@ -105,6 +109,8 @@ if __name__ == "__main__":
         index_loader.start()
         D_matrix, I_matrix, file_idx_matrix = search_outterloop_index_async(rstopology, queries, idx_k, k, idx_paths, index_store)
         index_loader.stop_loading()
+    else:
+        raise ValueError("Invalid search topology")
 
     end_time = time.perf_counter()
     qb_runtime = end_time - start_time
@@ -112,15 +118,18 @@ if __name__ == "__main__":
     if "index_async" == search_topology.lower():
         index_loader.join()
 
-    print()
-    print("Distances")
-    print(D_matrix)
-    print()
-    print("Index")
-    print(I_matrix)
-    print()
-    print("Index file")
-    print(file_idx_matrix)
+    if args.verbose:
+        print()
+        print("Distances")
+        print(D_matrix)
+        print()
+        print("Index")
+        print(I_matrix)
+        print()
+        print("Index file")
+        print(file_idx_matrix)
 
     print(f"Search time: {qb_runtime:.8f}s")
-    # logging.info(f"batch_completed_{num_queries},{qb_runtime:.8f}s,nan")
+    
+    # Sort index ranking dict: "index_manager.ranking_dict"
+    # pprint(sorted(index_manager.ranking_dict.items(), key=lambda x: x[1], reverse=True))
