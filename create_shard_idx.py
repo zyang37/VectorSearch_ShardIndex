@@ -11,7 +11,7 @@ import argparse
 import numpy as np
 
 from utils.read_write import save_np_to_file, load_npy
-from utils.vdb_utils import random_normal_vectors, save_index, random_floats
+from utils.vdb_utils import random_normal_vectors, save_index, random_floats, random_mv_normal_vectors
 
 # fix random seed
 # np.random.seed(0)
@@ -49,7 +49,7 @@ if __name__ == "__main__":
     parser.add_argument("-idx", "--idx_root", required=False, default="shards/idxs/", help="dir to index files", type=str,)
     # args for random generation
     parser.add_argument("-d", "--dim", default=128, help="dimension of embeddings", type=int,)
-    parser.add_argument("-ns", "--num_shards", default=1000, help="number of shards", type=int,)
+    parser.add_argument("-ns", "--num_shards", default=100, help="number of shards", type=int,)
     parser.add_argument("--cluster_size", default=10000, help="number of embeddings per shard", type=int,)
     args = parser.parse_args()
 
@@ -75,6 +75,7 @@ if __name__ == "__main__":
         # random_mean = [0]
         random_std = [0.5]
         embeds = random_normal_vectors(cluster_size, dim, random_mean[0], random_std[0])
+        # embeds = random_mv_normal_vectors(cluster_size, dim)
         embeds_centroids[i] = compute_embeds_avgs(embeds)
         save_np_to_file(os.path.join(npy_root, f"embeds_{i}.npy"), embeds)
         print(f"embeds_{i}.npy created")

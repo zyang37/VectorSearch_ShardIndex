@@ -61,10 +61,13 @@ class IndexStore:
     '''
     A class to store indexes in memory for faster access
     '''
-    def __init__(self, max_indexes=1000):
+    def __init__(self, max_indexes=1000, index_manager=None):
         self.indexes = {}
         self.num_indexes = 0
         self.max_indexes = max_indexes
+        self.index_manager = index_manager
+        self.local_ranking_dict = {}
+        self.local_ranking_list = []
 
     @Logger.log_index_load_time
     def load_index(self, index_path):
@@ -73,46 +76,80 @@ class IndexStore:
         return faiss.read_index(index_path)
 
     def add_index_from_path(self, index_path):
-        # Remove the first index if the number of indexes exceeds the max indexes
-        if self.at_capacity():
-            self.swap_index()
-        self.indexes[index_path] = self.load_index(index_path)
-        self.num_indexes += 1
+        self.add_index(index_path, self.load_index(index_path))
 
     def add_index(self, index_path, index):
-        # Remove the first index if the number of indexes exceeds the max indexes
+        # handle evicting indexes if the store is at capacity
         if self.at_capacity():
-            # self.remove_index(list(self.indexes.keys())[0])
-            self.swap_index()
+            self.evict_index()
         self.indexes[index_path] = index
-        self.num_indexes += 1
+        self.num_indexes = len(self.indexes)
 
-    def get_index(self, index_path):
-        # Load the index if it is not in the store
+    def get_index(self, index_path, query_shape=None):
+        '''
+        User trying to get index
+            - User need it now
+            - Do not evict this index
+
+        args:
+            - index_path: str, path to the index file
+            - query_size: int, use to update the ranking
+        '''
+        if self.index_manager is not None:
+            self.index_manager.update_index_rank(index_path, query_shape[0])
+
+        # evict before adding new index
+        if self.at_capacity():
+            self.evict_index()
+
         if index_path not in self.indexes:
-            # print("NOT in store!")
-            index = self.load_index(index_path)
-            # Add the index to the store
-            self.add_index(index_path, index)
+            self.add_index_from_path(index_path)
+        
         return self.indexes[index_path]
 
     def remove_index(self, index_path):
-        del self.indexes[index_path]
-        self.num_indexes -= 1
+        try:
+            '''
+            Note: calling remove from index store is fine. 
+            But when it is called outside of the store, sometime it is already removed.
+            '''
+            del self.indexes[index_path]
+            self.num_indexes = len(self.indexes)
+        except:
+            print("delete index failed")
+
+    def remove_multiple_indexes(self, index_paths):
+        for index_path in index_paths:
+            self.remove_index(index_path)
 
     def at_capacity(self):
+        if self.num_indexes > self.max_indexes:
+            raise Exception("Index store is exceeding the maximum capacity!!! there is a bug in the code.")
         return self.num_indexes >= self.max_indexes
     
-    # NEED TO UPDATE!!!
-    def swap_index(self):
+    def reset_local_ranking(self):
+        self.local_ranking_dict = {}
+        for index_path in self.indexes.keys():
+            # obtain ranking for DRAM-index from the index manager
+            self.local_ranking_dict[index_path] = self.index_manager.ranking_dict[index_path]
+
+    # BUG: this function is not working properly
+    def evict_index(self):
         # get a key to remove, and call remove_index
-        # Currently, remove the first index
-        remove_ids_key = list(self.indexes.keys())[0]
+        if self.index_manager is not None:
+            self.reset_local_ranking()
+            self.local_ranking_list = sorted(self.local_ranking_dict, key=self.local_ranking_dict.get, reverse=True)
+            remove_ids_key = self.local_ranking_list[-1]
+            # print(self.local_ranking_dict)
+            # print(remove_ids_key)
+        else:
+            remove_ids_key = list(self.indexes.keys())[0]
         self.remove_index(remove_ids_key)
 
 
 
-# NOT USED SLOW
+# ===================================================================================================
+# NOT USED
 class ProcessDataLoader(multiprocessing.Process):
     def __init__(self, Index_store, all_file_paths:list, stopology):
         super().__init__()

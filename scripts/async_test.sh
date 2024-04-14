@@ -1,6 +1,8 @@
 #!/bin/bash
 
 # define variables for the script
+
+# good parameter
 NUM_QUERIES=12000
 K=10
 NPROBE=10
