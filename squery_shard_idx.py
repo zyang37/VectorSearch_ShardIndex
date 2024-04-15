@@ -31,7 +31,7 @@ if __name__ == "__main__":
     parser.add_argument("-k", default=10, help="top k results", type=int,)
     parser.add_argument("-nq", "--num_query", default=10000, help="number of queries", type=int,)
     parser.add_argument("-mr", "--mixtures_ratios", nargs="+", default=[0.], help="mixtures ratio for random queries (-mr 0.1 0.2 0.3)", type=float,)
-
+    parser.add_argument("-rp", "--ranking_policy", required=False, default="LRU", help="LRU or LFU", type=str,)
     parser.add_argument("--log", required=False, default="logs/app.log", help="log file", type=str,)
     parser.add_argument("-mi", "--max_index_store", default=1000, help="max indexes to store", type=int,)
     parser.add_argument("-d", "--dim", default=128, help="dimension of embeddings", type=int,)
@@ -42,6 +42,7 @@ if __name__ == "__main__":
     index_root = args.idx_root
     nprobe = args.nprobe
     k = args.k
+    rank_policy = args.ranking_policy
     dim = args.dim
     num_queries = args.num_query
     mixtures_ratios = args.mixtures_ratios
@@ -71,26 +72,31 @@ if __name__ == "__main__":
         else:
             idx_paths.append(os.path.join(index_root, f))    
 
+    idxpath2id_map = {idx_path: idx for idx, idx_path in enumerate(idx_paths)}
+
     # Generate multiple random queries batch
     query_batches = []
     for mr in mixtures_ratios:
         query_batches.append(random_queries_mix_distribs(num_queries, dim, mixtures_ratio=mr, low=-1, high=1, seed=seed))
 
     # init index manager and store
-    index_manager = IndexManager()
+    index_manager = IndexManager(policy=rank_policy)
     index_store = IndexStore(max_indexes=max_index_store, index_manager=index_manager)
     dispatcher = Dispatcher(centriod_idx_paths, index_store, verbose=args.verbose)
     index_loader = ThreadDataLoader(index_store, idx_paths)
     index_loader.start()
 
     index_store.set_index_loader(index_loader)
+
+    print("- {} requests".format(len(query_batches)))
     
+    tputs_list = []
+    serve_start_time = time.perf_counter()
     for i, qb in enumerate(query_batches):
         # start loading hot idx here if ranking exists
         index_loader.resume_loading()
 
         # print(len(index_store.indexes))
-        start_time = time.perf_counter()
 
         dispatcher.search_knn_centroids(qb, nprobe)
         rstopology = dispatcher.create_search_outterloop_index_topology()
@@ -99,30 +105,43 @@ if __name__ == "__main__":
         rstopology = {k: v for k, v in sorted(rstopology.items(), key=lambda item: len(item[1]), reverse=True)}
         
         # need update, want to reorder stopology so that DRAM-idx start first, then sort by batch size
-        index_store.clearup(stopology=rstopology)
+        # print(len(rstopology))
+        # print(list(rstopology.keys())[:10])
+        rstopology = index_store.cleanup(stopology=rstopology, idxpath2id_map=idxpath2id_map)
+        # print(list(rstopology.keys())[:10])
 
         # print(len(rstopology))
         index_loader.pause_loading()
         index_loader.update_files_to_load([idx_paths[idx] for idx in rstopology.keys()])
         index_loader.resume_loading()
         
+        start_time = time.perf_counter()
         D_matrix, I_matrix, file_idx_matrix = search_outterloop_index_async(rstopology, qb, idx_k, k, idx_paths, index_store)
-        
-        index_loader.pause_loading()
-        hot_idxs = index_manager.get_head_index(k=max_index_store)
-        index_loader.update_files_to_load(hot_idxs)
-
         end_time = time.perf_counter()
         qb_runtime = end_time - start_time
-        print(f"Search time: {qb_runtime:.8f}s")
 
-        time.sleep(0.01)
+        tput = num_queries / qb_runtime
+        tputs_list.append(tput)
+        # print(f"Runtime: {qb_runtime:.8f}s")
+        print(f"tput: {tput:.2f} queries/s")
+
+        index_loader.pause_loading()
+        hot_idxs = index_manager.get_head_index(k=max_index_store-1)
+        hot_idxs_with_centroid = [centriod_idx_paths] + hot_idxs
+        index_loader.update_files_to_load(hot_idxs_with_centroid)
+        # print("Hot idxs:", hot_idxs[-5:])
+        index_loader.resume_loading()
+
+        # time.sleep(0.003)
         
         # if reached the last query batch, stop the loader
         if i == len(query_batches) - 1:
             index_loader.stop_loading()
             index_loader.join()
 
+    serve_runtime = time.perf_counter() - serve_start_time
+    print(f"serve time: {serve_runtime:.8f}s")
+    print(f"avg tput: {np.mean(tputs_list):.2f} queries/s\n")
 
     if args.verbose:
         print()

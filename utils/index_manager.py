@@ -17,6 +17,7 @@ class IndexManager:
         args:
             - policy: str, the ranking policy to use, either LFU or LRU
                 - LFU: Least Frequently Used
+                - LRU: Least Recently Used
         '''
         self.policy = policy
 

@@ -23,7 +23,7 @@ class ThreadDataLoader(threading.Thread):
         self.index_store = Index_store
         self.all_file_paths = all_file_paths
         
-        # self.lock = threading.Lock()
+        self.lock = self.index_store.lock
         self.file_paths_to_load = []
         # self.pause_loading()
 
@@ -31,9 +31,22 @@ class ThreadDataLoader(threading.Thread):
         # print("loading task is starting")
         while self.keep_running:
             self.paused.wait()  # This will block if the loader is paused
-            if len(self.file_paths_to_load)==0 or self.index_store.at_capacity():
+            # if len(self.file_paths_to_load)==0 or self.index_store.at_capacity():
+            #     self.pause_loading()
+            #     continue
+
+            if len(self.file_paths_to_load)==0:
+                with self.lock:
+                    hot_idxs = self.index_store.index_manager.get_head_index(k=self.index_store.max_indexes)
+                    if len(hot_idxs) > 1:
+                        # when it is 1, means it only contains centroid index, not need to keep loading it
+                        self.file_paths_to_load = hot_idxs
+                    continue
+
+            if self.index_store.at_capacity():
                 self.pause_loading()
                 continue
+
             self.fetch_data(self.file_paths_to_load[0])
 
     def update_files_to_load(self, file_paths):
@@ -44,6 +57,7 @@ class ThreadDataLoader(threading.Thread):
 
     def fetch_data(self, file_path):
         # Add index to the store
+        # if file_path not in self.index_store.indexes:
         self.index_store.add_index_from_path(file_path)
         # print(f"Index {file_path} has been loaded.")
         try:
@@ -76,30 +90,64 @@ class IndexStore:
         self.index_loader = None
         self.local_ranking_dict = {}
         self.local_ranking_list = []
-
         self.lock = threading.Lock()
+
+        '''
+        Obtain rank_policy from index_manager
+            - LFU: Least Frequently Used
+            - LRU: Least Recently Used
+        '''
+        if self.index_manager is not None:
+            self.rank_policy = self.index_manager.policy
 
     def set_index_loader(self, index_loader):
         self.index_loader = index_loader
 
-    def clearup(self, stopology):
+    def cleanup(self, stopology, idxpath2id_map):
         '''
         rm idx that is not in stopology, used in serving
         '''
+        updated_stopology = stopology.copy()
         remove_idxs = []
-        dram_required_idxs = []
-        for idx in self.indexes.keys():
-            if idx not in stopology.keys():
-                remove_idxs.append(idx)
-            else:
-                dram_required_idxs.append(idx)
+        dram_required_idxs = [] # [(idx: [q1,q2], ...)]
+
+        # BE CAREFUL: indexes: {full_idx_path: [q1]}, stopology: {idx: [q1]}
+        with self.lock:
+            for idx_path in self.indexes.keys():
+                if "centroids" in idx_path:
+                    # centroid will not present in stopology
+                    continue
+                idx = idxpath2id_map[idx_path]
+                if idx not in updated_stopology.keys():
+                    remove_idxs.append(idx)
+                else:
+                    dram_required_idxs.append( (idx, updated_stopology[idx]) )
+
+                    # Update later
+                    del updated_stopology[idx]
+        
+        # clear up unnecessary indexes
+        # print("clean up: ", remove_idxs)
         self.remove_multiple_indexes(remove_idxs)
-        return dram_required_idxs
+
+        '''
+        Locality aware batching
+            1. Search required DRAM-idxs for vsearch
+            2. Sort by batch size (small batch goes 1st)
+                - finish faster quickly allow to load more indexes
+            3. Append old st to the end
+        '''
+        # dram_required_idxs = sorted(dram_required_idxs, key=lambda x: len(x[1]), reverse=False)
+        # print(len(dram_required_idxs))
+        dram_required_idxs.extend(list(updated_stopology.items()))
+        updated_stopology = dict(dram_required_idxs)
+        return updated_stopology
 
     @Logger.log_index_load_time
     def load_index(self, index_path):
         # update index status, 1 means it is currently loading
-        self.indexes[index_path] = "loading"
+        with self.lock:
+            self.indexes[index_path] = "loading"
         return faiss.read_index(index_path)
 
     def add_index_from_path(self, index_path):
@@ -132,7 +180,10 @@ class IndexStore:
             - query_size: int, use to update the ranking
         '''
         if self.index_manager is not None:
-            self.index_manager.update_index_rank(index_path, query_shape[0])
+            if self.rank_policy == 'LFU':
+                self.index_manager.update_index_rank(index_path, query_shape[0])
+            else:
+                self.index_manager.update_index_rank(index_path, time.perf_counter())
 
         # evict before adding new index
         # if self.at_capacity():
@@ -141,33 +192,45 @@ class IndexStore:
         if index_path not in self.indexes:
             # print("NOT loaded yet. Loading now...")
             self.add_index_from_path(index_path)
+        elif self.indexes[index_path] == "loading":
+            while self.indexes[index_path] == "loading":
+                time.sleep(0.000001)
         
         return self.indexes[index_path]
 
     def remove_index(self, index_path):
+        with self.lock:
+            if index_path in self.indexes:
+                del self.indexes[index_path]
+                self.num_indexes -= 1
+        
+        if self.index_loader is not None:
+            self.index_loader.resume_loading()
+
+        return 
         try:
             '''
             Note: calling remove from index store is fine. 
             But when it is called outside of the store, sometime it is already removed.
             '''
             with self.lock:
-                # print("in rm lock")
                 del self.indexes[index_path]
                 self.num_indexes -= 1
-        except:
+        except Exception as e: 
+            # print the error message
+            print(e)
             print("delete index failed")
-
-        if self.index_loader is not None:
-            self.index_loader.resume_loading()
 
     def remove_multiple_indexes(self, index_paths):
         for index_path in index_paths:
             self.remove_index(index_path)
 
     def at_capacity(self):
-        if self.num_indexes > self.max_indexes:
-            raise Exception("Index store is exceeding the maximum capacity!!! there is a bug in the code. {} > {}".format(self.num_indexes, self.max_indexes))
-        return self.num_indexes >= self.max_indexes
+        with self.lock:
+            self.num_indexes = len(self.indexes)
+            if self.num_indexes > self.max_indexes:
+                raise Exception("Index store is exceeding the maximum capacity!!! there is a bug in the code. {} > {}".format(self.num_indexes, self.max_indexes))
+            return self.num_indexes >= self.max_indexes
     
     def reset_local_ranking(self):
         self.local_ranking_dict = {}
@@ -179,13 +242,11 @@ class IndexStore:
                 # index could be swapped out but have a ranking
                 self.local_ranking_dict[index_path] = 0
 
-    # BUG: this function is not working properly
     def evict_index(self):
         if self.index_manager is not None:
             self.reset_local_ranking()
             self.local_ranking_list = sorted(self.local_ranking_dict, key=self.local_ranking_dict.get, reverse=True)
             remove_ids_key = self.local_ranking_list[-1]
-            # print(remove_ids_key)
         else:
             remove_ids_key = list(self.indexes.keys())[0]
         self.remove_index(remove_ids_key)

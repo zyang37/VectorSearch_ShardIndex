@@ -1,6 +1,6 @@
 #!/bin/bash
 
-ST=query
+ST=index_async
 NUM_QUERIES=10000
 K=10
 NPROBE=10
