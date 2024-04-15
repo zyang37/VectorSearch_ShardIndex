@@ -176,6 +176,7 @@ def search_outterloop_index_async(stopology, queries, idx_k, k, idx_paths, index
 
         D, I = query_index_file(idx_paths[file_idx], query_batch, idx_k, index_store)
         index_store.remove_index(idx_paths[file_idx])
+        # time.sleep(0.01)
         file_idx_m = np.ones_like(D) * file_idx
         
         # merge and compare results in final matrix (D), then save top k

@@ -13,28 +13,24 @@ class Dispatcher:
     '''
     Dispatcher re-batch queries in a "intelligent" way, then search knn centroids and return a search topology
     '''
-    def __init__(self, centriod_idx_paths, queries, nprobe, index_store, verbose=True):
+    def __init__(self, centriod_idx_paths, index_store, verbose=True):
         self.centriod_idx_paths = centriod_idx_paths
-        self.queries = queries
-        self.nprobe = nprobe
         self.index_store = index_store
         self.verbose = verbose
-
-        self.search_knn_centroids()
 
     def batch_by_distruibution(self):
         pass
 
-    def search_knn_centroids(self):
-        self.D, self.I = query_index_file(self.centriod_idx_paths, self.queries, self.nprobe, self.index_store)
+    def search_knn_centroids(self, queries, nprobe):
+        self.D, self.I = query_index_file(self.centriod_idx_paths, queries, nprobe, self.index_store)
         if self.verbose:
             print("Top-k centroids")
             print(self.I)
             print()
 
-    def create_search_outterloop_query_topology(self):
+    def create_search_outterloop_query_topology(self, queries):
         stopology = {}
-        for i in range(len(self.queries)):
+        for i in range(len(queries)):
             stopology[i] = list(self.I[i])
         return stopology
     
