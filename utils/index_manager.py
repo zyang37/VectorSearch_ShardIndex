@@ -10,16 +10,25 @@ class IndexManager:
     """
     A class to manage index file rankings
     """
-    def __init__(self):
+    def __init__(self, policy='LFU'):
         '''
         The manager keep track of all the indexes and their rankings. Always assume reverse=True, the ranking is in descending order
+        
+        args:
+            - policy: str, the ranking policy to use, either LFU or LRU
+                - LFU: Least Frequently Used
         '''
+        self.policy = policy
+
         self.rankings = []
         self.ranking_dict = {}
         self.ranking_updated = True
 
     def update_index_rank(self, index_path, rank):
-        self.ranking_dict[index_path] = rank
+        if self.policy == 'LFU' and index_path in self.ranking_dict:
+            self.ranking_dict[index_path] += rank
+        else:
+            self.ranking_dict[index_path] = rank
         self.ranking_updated = False
 
     def get_tail_index(self, k=1):

@@ -26,12 +26,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Query shard index for vector database")
     parser.add_argument("-idx", "--idx_root", required=False, default="shards/idxs/", help="dir to index files", type=str,)
     parser.add_argument("-np", "--nprobe", default=10, help="a small number (nprobe) of subsets to visit", type=int,)
-    parser.add_argument("-k", default=3, help="top k results", type=int,)
-    parser.add_argument("-nq", "--num_query", default=5, help="number of queries", type=int,)
+    parser.add_argument("-k", default=10, help="top k results", type=int,)
+    parser.add_argument("-nq", "--num_query", default=10000, help="number of queries", type=int,)
     parser.add_argument("-mr", "--mixtures_ratio", default=0., help="mixtures ratio for random queries", type=float,)
     parser.add_argument("--log", required=False, default="logs/app.log", help="log file", type=str,)
     parser.add_argument("-mi", "--max_index_store", default=1000, help="max indexes to store", type=int,)
-    parser.add_argument("-st", "--search_topology", default="index", 
+    parser.add_argument("-st", "--search_topology", default="index_async", 
                         help="search topology: <index>, <query> or <index_async>", type=str,)
     # hardcode args for now
     parser.add_argument("-d", "--dim", default=128, help="dimension of embeddings", type=int,)
@@ -89,23 +89,27 @@ if __name__ == "__main__":
 
     index_manager = IndexManager()
     index_store = IndexStore(max_indexes=max_index_store, index_manager=index_manager)
-    dispatcher = Dispatcher(centriod_idx_paths, queries, nprobe, index_store, verbose=args.verbose)
+    dispatcher = Dispatcher(centriod_idx_paths, index_store, verbose=args.verbose)
+    dispatcher.search_knn_centroids(queries, nprobe)
 
     # inference
     start_time = time.perf_counter()
     
     if "query" == search_topology.lower():
-        stopology = dispatcher.create_search_outterloop_query_topology()
+        stopology = dispatcher.create_search_outterloop_query_topology(queries)
         D_matrix, I_matrix, file_idx_matrix = search_outterloop_query(stopology, queries, idx_k, k, idx_paths, index_store)
     elif "index" == search_topology.lower():
         # rstopology = query_to_index_stopology(stopology)
         rstopology = dispatcher.create_search_outterloop_index_topology()
+        print("s: {}".format(len(rstopology)))
         D_matrix, I_matrix, file_idx_matrix = search_outterloop_index(rstopology, queries, idx_k, k, idx_paths, index_store)
     elif "index_async" == search_topology.lower():
         rstopology = dispatcher.create_search_outterloop_index_topology()
+        print("s: {}".format(len(rstopology)))
         # sort rs topology by length of values
         rstopology = {k: v for k, v in sorted(rstopology.items(), key=lambda item: len(item[1]), reverse=True)}
-        index_loader = ThreadDataLoader(index_store, idx_paths, rstopology)
+        index_loader = ThreadDataLoader(index_store, idx_paths)
+        index_loader.parse_stopology(rstopology)
         index_loader.start()
         D_matrix, I_matrix, file_idx_matrix = search_outterloop_index_async(rstopology, queries, idx_k, k, idx_paths, index_store)
         index_loader.stop_loading()
