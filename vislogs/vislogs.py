@@ -87,4 +87,4 @@ if __name__ == "__main__":
     fig, ax = create_gantt_chart(load_index_hbars, search_index_hbars, ax=None)
     ax.set_title(log_file)
     fig.tight_layout()
-    fig.savefig("vislogs/tmp.pdf")
+    fig.savefig("vislogs_tmp.pdf")

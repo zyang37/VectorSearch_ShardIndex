@@ -181,7 +181,7 @@ class IndexStore:
         '''
         if self.index_manager is not None:
             if self.rank_policy == 'LFU':
-                self.index_manager.update_index_rank(index_path, query_shape[0])
+                self.index_manager.update_index_rank(index_path, query_shape[0]/1000.)
             else:
                 self.index_manager.update_index_rank(index_path, time.perf_counter())
 

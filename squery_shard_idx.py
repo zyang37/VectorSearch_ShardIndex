@@ -30,7 +30,8 @@ if __name__ == "__main__":
     parser.add_argument("-np", "--nprobe", default=10, help="a small number (nprobe) of subsets to visit", type=int,)
     parser.add_argument("-k", default=10, help="top k results", type=int,)
     parser.add_argument("-nq", "--num_query", default=10000, help="number of queries", type=int,)
-    parser.add_argument("-mr", "--mixtures_ratios", nargs="+", default=[0.], help="mixtures ratio for random queries (-mr 0.1 0.2 0.3)", type=float,)
+    parser.add_argument("-num_mr", "--random_mixtures_ratios", default=None, help="generate random mixtures ratios", type=int,)
+    parser.add_argument("-mr", "--mixtures_ratios", nargs="+", default=[0.], help="mixtures ratio for random queries (-mr 0. 0.001 0.1)", type=float,)
     parser.add_argument("-rp", "--ranking_policy", required=False, default="LRU", help="LRU or LFU", type=str,)
     parser.add_argument("--log", required=False, default="logs/app.log", help="log file", type=str,)
     parser.add_argument("-mi", "--max_index_store", default=1000, help="max indexes to store", type=int,)
@@ -49,12 +50,20 @@ if __name__ == "__main__":
     max_index_store = args.max_index_store
     search_topology = "index_async"
     seed = args.seed
+    num_random_mixtures_ratios = args.random_mixtures_ratios
 
     if args.verbose:
         print(args)
 
     if seed is not None:
         np.random.seed(seed)
+
+    if num_random_mixtures_ratios is not None:
+        mrs = [0., 0., 0., 0., 0., 0.001, 0.002, 0.003, 0.005]
+        mixtures_ratios = np.random.choice(mrs, num_random_mixtures_ratios)
+        # bug: for some reason, has to start with 0., stuck otherwise
+        mixtures_ratios[0] = 0.
+        print(mixtures_ratios)
 
     os.makedirs("logs", exist_ok=True)
     time_format = "%Y-%m-%d %H:%M:%S"
@@ -74,11 +83,6 @@ if __name__ == "__main__":
 
     idxpath2id_map = {idx_path: idx for idx, idx_path in enumerate(idx_paths)}
 
-    # Generate multiple random queries batch
-    query_batches = []
-    for mr in mixtures_ratios:
-        query_batches.append(random_queries_mix_distribs(num_queries, dim, mixtures_ratio=mr, low=-1, high=1, seed=seed))
-
     # init index manager and store
     index_manager = IndexManager(policy=rank_policy)
     index_store = IndexStore(max_indexes=max_index_store, index_manager=index_manager)
@@ -88,11 +92,19 @@ if __name__ == "__main__":
 
     index_store.set_index_loader(index_loader)
 
-    print("- {} requests".format(len(query_batches)))
+    print("- {} requests".format(len(mixtures_ratios)))
     
+    num_queries_list = []
+    avg_tputs_list = []
     tputs_list = []
     serve_start_time = time.perf_counter()
-    for i, qb in enumerate(query_batches):
+
+    # for i, qb in enumerate(query_batches):
+    for i, mr in enumerate(mixtures_ratios):
+        qb = random_queries_mix_distribs(num_queries, dim, mixtures_ratio=mr, low=-1, high=1, seed=seed)
+
+        num_queries_list.append(qb.shape[0])
+
         # start loading hot idx here if ranking exists
         index_loader.resume_loading()
 
@@ -120,10 +132,13 @@ if __name__ == "__main__":
         end_time = time.perf_counter()
         qb_runtime = end_time - start_time
 
-        tput = num_queries / qb_runtime
-        tputs_list.append(tput)
+        curr_tput = num_queries_list[-1] / qb_runtime
+        tputs_list.append(curr_tput)
+        avg_tput = np.mean(tputs_list)
+        avg_tputs_list.append(avg_tput)
         # print(f"Runtime: {qb_runtime:.8f}s")
-        print(f"tput: {tput:.2f} queries/s")
+        # print(f"avg_tput: {avg_tput:.2f} queries/s; curr_tput: {curr_tput:.2f} queries/s")
+        print(f"served: {end_time-serve_start_time:.5f} s; tput: {curr_tput:.3f} queries/s; avgtput: {avg_tput:.3f} queries/s")
 
         index_loader.pause_loading()
         hot_idxs = index_manager.get_head_index(k=max_index_store-1)
@@ -135,12 +150,12 @@ if __name__ == "__main__":
         # time.sleep(0.003)
         
         # if reached the last query batch, stop the loader
-        if i == len(query_batches) - 1:
+        if i == len(mixtures_ratios) - 1:
             index_loader.stop_loading()
             index_loader.join()
 
     serve_runtime = time.perf_counter() - serve_start_time
-    print(f"serve time: {serve_runtime:.8f}s")
+    # print(f"serve time: {serve_runtime:.8f}s")
     print(f"avg tput: {np.mean(tputs_list):.2f} queries/s\n")
 
     if args.verbose:
