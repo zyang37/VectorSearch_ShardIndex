@@ -55,6 +55,8 @@ def random_queries_mix_distribs(num_queries, dim, mixtures_ratio=1, low=-1, high
         # queries = np.random.uniform(low=low, high=high, size=(num_queries, dim)).astype('float32')
         return queries
     else:
+        # TODO: Hard!!!!!!!!!!!!
+
         # draw some queries from different distributions
         num_query_from_diff_distr = int(num_queries * mixtures_ratio)
         for i in range(num_query_from_diff_distr):
@@ -65,10 +67,15 @@ def random_queries_mix_distribs(num_queries, dim, mixtures_ratio=1, low=-1, high
         random_mean = random_floats(1, low, high)[0]
         for i in range(num_query_from_diff_distr, num_queries):
             queries[i] = random_normal_vectors(1, dim, random_mean, random_std)
-        # uniform_queries = np.random.uniform(low=low, high=high, size=(num_query_from_diff_distr, dim)).astype('float32')
+
+        # version 2 
+        # means = np.random.uniform(low, high, dim)
+        # std_devs = np.random.uniform(0.1, 1, dim)
+        # diverse_queries = np.random.normal(loc=means, scale=std_devs, size=(num_query_from_diff_distr, dim))
+
         # random_mean = random_floats(1, low, high)[0]
-        # normal_queries = random_normal_vectors(num_queries - num_query_from_diff_distr, dim, random_mean, random_std).astype('float32')
-        # queries = np.concatenate((uniform_queries, normal_queries), axis=0)
+        # similar_queries = np.random.normal(random_mean, random_std[0], size=(num_queries-num_query_from_diff_distr, dim))
+        # queries = np.concatenate((diverse_queries, similar_queries), axis=0)
     return queries
 
 def random_embeddings(num_embeds, dim, seed=None):

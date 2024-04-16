@@ -1,12 +1,12 @@
 #!/bin/bash
 
-ST=index
-NUM_QUERIES=10000
+ST=query
+NUM_QUERIES=15000
 K=10
 NPROBE=10
-MIXTURES_RATIO=0.01
+MIXTURES_RATIO=0.000
 
-for i in 1 100 200 300 400 500 600 700 800 900 1000
+for i in 2 10 20 30 40 50 60 70 80 90 100 110 120 130 140 150
 do
     echo $i
     python query_shard_idx.py -nq $NUM_QUERIES -k $K --nprobe $NPROBE \
