@@ -1,14 +1,14 @@
 
-# Serving Vecter Search for Large Datasets with Index Shards
+# Efficient Serving of Large-scale Vector Search with Sharded Indexes
 
-## Generate the shards
+## Generate index shards
 ```
 mkdir shards
 
 python create_shard_idx.py
 ```
 
-## Then run the query
+## Query index shards
 ```
 python query_shard_idx.py
 ```
