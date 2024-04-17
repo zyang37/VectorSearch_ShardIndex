@@ -1,14 +1,22 @@
 
-# Serving Vecter Search for Large Datasets with Index Shards
+# Efficient Serving of Large-scale Vector Search with Sharded Indexes
 
-## Generate the shards
+A prototype system built on top of Faiss for efficient performing vector search on large datasets with sharded indexes. 
+
+<!-- <p align="center">
+  <img src="doc/pref.png" alt="..."> -->
+# ![](doc/pref.png)
+
+## Setup (In-progress)
+
+## Generate synthetic index shards
 ```
 mkdir shards
 
 python create_shard_idx.py
 ```
 
-## Then run the query
+## Querying sharded indexes
 ```
 python query_shard_idx.py
 ```
