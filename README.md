@@ -3,9 +3,9 @@
 
 A prototype system built on top of Faiss for efficient vector search on large datasets with sharded indexes.
 
-<p align="center">
-  <img src="doc/pref.png" alt="..." width="500"/>
-<!-- # ![](doc/pref.png) -->
+<!-- <p align="center">
+  <img src="doc/pref.png" alt="..." width="500"/> -->
+# ![](doc/pref.png)
 
 ## Setup (In-progress)
 
