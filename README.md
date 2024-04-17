@@ -1,11 +1,11 @@
 
 # Efficient Serving of Large-scale Vector Search with Sharded Indexes
 
-A prototype system built on top of Faiss for efficient performing vector search on large datasets with sharded indexes. 
+A prototype system built on top of Faiss for efficient vector search on large datasets with sharded indexes.
 
-<!-- <p align="center">
-  <img src="doc/pref.png" alt="..."> -->
-# ![](doc/pref.png)
+<p align="center">
+  <img src="doc/pref.png" alt="..." width="500"/>
+<!-- # ![](doc/pref.png) -->
 
 ## Setup (In-progress)
 
