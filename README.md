@@ -7,7 +7,10 @@ A prototype system built on top of Faiss for efficient vector search on large da
   <img src="doc/pref.png" alt="..." width="500"/> -->
 # ![](doc/pref.png)
 
-## Setup (In-progress)
+## Setup
+```
+pip install -r requirements.txt
+```
 
 ## Generate synthetic index shards
 ```
