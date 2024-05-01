@@ -96,18 +96,27 @@ if __name__ == "__main__":
     start_time = time.perf_counter()
     
     if "query" == search_topology.lower():
+        plan_gen_start = time.perf_counter()
         stopology = dispatcher.create_search_outterloop_query_topology(queries)
+        plan_gen_time = time.perf_counter() - plan_gen_start
+        print(f"Plan generation time: {plan_gen_time:.8f}s")
+        # exit()
         D_matrix, I_matrix, file_idx_matrix = search_outterloop_query(stopology, queries, idx_k, k, idx_paths, index_store)
     elif "index" == search_topology.lower():
         # rstopology = query_to_index_stopology(stopology)
         rstopology = dispatcher.create_search_outterloop_index_topology()
-        print("s: {}".format(len(rstopology)))
+        # print("s: {}".format(len(rstopology)))
         D_matrix, I_matrix, file_idx_matrix = search_outterloop_index(rstopology, queries, idx_k, k, idx_paths, index_store)
     elif "index_async" == search_topology.lower():
+        plan_gen_start = time.perf_counter()
         rstopology = dispatcher.create_search_outterloop_index_topology()
-        print("s: {}".format(len(rstopology)))
+        # print("s: {}".format(len(rstopology)))
         # sort rs topology by length of values
         rstopology = {k: v for k, v in sorted(rstopology.items(), key=lambda item: len(item[1]), reverse=True)}
+        plan_gen_time = time.perf_counter() - plan_gen_start
+        print(f"Plan generation time: {plan_gen_time:.8f}s")
+        # exit()
+
         index_loader = ThreadDataLoader(index_store, idx_paths)
         index_loader.parse_stopology(rstopology)
         index_loader.start()
